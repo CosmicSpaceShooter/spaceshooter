@@ -1,0 +1,3683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Horror Space Shooter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Creepster&display=swap" rel="stylesheet">
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-analytics-compat.js"></script>
+    <!-- Unity Ads SDK -->
+    <script src="https://cdn.unityads.unity3d.com/stable/unityads.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            overflow: hidden;
+            font-family: 'Audiowide', 'Creepster', cursive, sans-serif;
+            background: #000;
+            color: #fff;
+            height: 100vh;
+            touch-action: manipulation;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            background: radial-gradient(ellipse at center, #110a0a 0%, #000000 100%);
+        }
+
+        #starfield {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .star {
+            position: absolute;
+            background-color: #fff;
+            border-radius: 50%;
+            animation: twinkle var(--duration) infinite ease-in-out;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 1; }
+        }
+
+        .nebula {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(30px);
+            opacity: 0.3;
+            mix-blend-mode: screen;
+            animation: float 60s infinite linear;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0); }
+            50% { transform: translate(50px, 50px); }
+            100% { transform: translate(0, 0); }
+        }
+
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 2;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        #score-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            color: #ff0000;
+            text-shadow: 0 0 10px #ff0000, 0 0 20px #8a0303;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid #ff0000;
+            font-family: 'Creepster', cursive;
+        }
+
+        #coins-display {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            font-size: 20px;
+            color: #ffcc00;
+            text-shadow: 0 0 10px #ffcc00;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 15px;
+            border-radius: 10px;
+            border: 1px solid #ffcc00;
+            font-family: 'Creepster', cursive;
+        }
+
+        #health-bar-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 200px;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            border: 1px solid #ff3366;
+            overflow: hidden;
+        }
+
+        #health-bar {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #ff0000 0%, #8a0303 100%);
+            transition: width 0.3s ease;
+            border-radius: 15px;
+        }
+
+        #health-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 14px;
+            color: white;
+            text-shadow: 0 0 5px #000;
+            font-family: 'Creepster', cursive;
+        }
+
+        #level-display {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            font-size: 20px;
+            color: #ff6600;
+            text-shadow: 0 0 10px #ff6600;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 15px;
+            border-radius: 10px;
+            border: 1px solid #ff6600;
+            font-family: 'Creepster', cursive;
+        }
+
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            display: none;
+        }
+
+        #game-over h1 {
+            font-size: 72px;
+            color: #ff0000;
+            text-shadow: 0 0 10px #ff0000, 0 0 30px #8a0303;
+            margin-bottom: 20px;
+            animation: pulse 1.5s infinite;
+            font-family: 'Creepster', cursive;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        #final-score {
+            font-size: 28px;
+            color: #ff6600;
+            margin-bottom: 20px;
+            font-family: 'Creepster', cursive;
+        }
+
+        #restart-btn {
+            background: linear-gradient(45deg, #8a0303, #ff0000);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.3s;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.7);
+            font-family: 'Creepster', cursive;
+            text-transform: uppercase;
+            margin: 10px 0;
+        }
+
+        #restart-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.9);
+            background: linear-gradient(45deg, #ff0000, #8a0303);
+        }
+
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        #start-screen h1 {
+            font-size: 72px;
+            color: #ff0000;
+            text-shadow: 0 0 10px #ff0000, 0 0 30px #8a0303;
+            margin-bottom: 10px;
+            animation: glow 2s infinite alternate;
+            font-family: 'Creepster', cursive;
+            letter-spacing: 3px;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 0 0 10px #ff0000, 0 0 20px #8a0303; }
+            to { text-shadow: 0 0 15px #ff0000, 0 0 30px #8a0303, 0 0 40px #ff6600; }
+        }
+
+        #game-title {
+            font-size: 24px;
+            color: #ff6600;
+            margin-bottom: 5px;
+            font-family: 'Creepster', cursive;
+            letter-spacing: 2px;
+        }
+
+        #game-by {
+            font-size: 18px;
+            color: #ccc;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        #game-company {
+            font-size: 22px;
+            color: #ff6600;
+            margin-bottom: 30px;
+            font-family: 'Creepster', cursive;
+        }
+
+        #start-screen p {
+            font-size: 18px;
+            color: #ccc;
+            margin-bottom: 30px;
+            text-align: center;
+            max-width: 80%;
+            line-height: 1.6;
+        }
+
+        #start-btn {
+            background: linear-gradient(45deg, #8a0303, #ff0000);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.7);
+            font-family: 'Creepster', cursive;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin: 10px 0;
+        }
+
+        #start-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.9);
+            background: linear-gradient(45deg, #ff0000, #8a0303);
+        }
+
+        #mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 4;
+            display: none;
+        }
+
+        .control-btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(138, 3, 3, 0.5);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 24px;
+            pointer-events: auto;
+            touch-action: manipulation;
+            border: 2px solid rgba(255, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            transition: all 0.2s;
+            font-family: 'Creepster', cursive;
+        }
+
+        .control-btn:active {
+            background: rgba(255, 0, 0, 0.7);
+            transform: scale(0.95);
+        }
+
+        #fire-btn {
+            background: rgba(138, 3, 3, 0.7);
+            border-color: rgba(255, 0, 0, 0.9);
+        }
+
+        #fire-btn:active {
+            background: rgba(255, 0, 0, 0.9);
+        }
+
+        #powerup-indicator {
+            position: absolute;
+            bottom: 100px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            padding: 10px;
+            border: 1px solid #ff6600;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #powerup-icon {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 5px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        #powerup-timer {
+            font-size: 12px;
+            color: #ff6600;
+            font-family: 'Creepster', cursive;
+        }
+
+        .explosion {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            background-image: radial-gradient(circle, #ff3300, #8a0303);
+            border-radius: 50%;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+            animation: explode 0.5s forwards;
+        }
+
+        @keyframes explode {
+            0% { transform: scale(0); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+
+        .blood-splatter {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 7;
+            opacity: 0;
+            background-image: radial-gradient(circle, rgba(138, 3, 3, 0.7) 0%, rgba(0, 0, 0, 0) 70%);
+            animation: fadeInOut 1s forwards;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; }
+            50% { opacity: 0.7; }
+            100% { opacity: 0; }
+        }
+
+        .horror-effect {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 8;
+            opacity: 0;
+            background-color: rgba(138, 3, 3, 0.3);
+            animation: horrorFlash 0.3s forwards;
+        }
+
+        @keyframes horrorFlash {
+            0% { opacity: 0; }
+            50% { opacity: 0.5; }
+            100% { opacity: 0; }
+        }
+
+        #login-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 11;
+        }
+
+        #login-container h2 {
+            font-size: 36px;
+            color: #ff6600;
+            margin-bottom: 20px;
+            font-family: 'Creepster', cursive;
+        }
+
+        #login-btn {
+            background: linear-gradient(45deg, #4285F4, #34A853);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 15px rgba(66, 133, 244, 0.7);
+            font-family: 'Audiowide', cursive;
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        #login-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(66, 133, 244, 0.9);
+        }
+
+        #login-btn img {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+        }
+
+        #user-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 20px;
+            border: 1px solid #ff6600;
+            z-index: 4;
+            pointer-events: auto;
+        }
+
+        #user-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        #user-name {
+            font-size: 14px;
+            color: white;
+            font-family: 'Audiowide', cursive;
+        }
+
+        #logout-btn {
+            background: transparent;
+            border: none;
+            color: #ff6600;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        #shop-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: linear-gradient(45deg, #ffcc00, #ff6600);
+            border: none;
+            color: #000;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(255, 204, 0, 0.7);
+            font-family: 'Creepster', cursive;
+            z-index: 4;
+            pointer-events: auto;
+            display: none;
+        }
+
+        #shop-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 204, 0, 0.9);
+        }
+
+        #shop-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            z-index: 12;
+            display: none;
+            overflow-y: auto;
+            padding: 20px 0;
+        }
+
+        #shop-screen h2 {
+            font-size: 36px;
+            color: #ffcc00;
+            margin-bottom: 20px;
+            font-family: 'Creepster', cursive;
+            text-align: center;
+        }
+
+        .shop-category {
+            width: 90%;
+            max-width: 800px;
+            margin-bottom: 30px;
+            background: rgba(20, 0, 0, 0.7);
+            border-radius: 15px;
+            padding: 15px;
+            border: 2px solid #ff6600;
+        }
+
+        .category-title {
+            font-size: 24px;
+            color: #ff6600;
+            margin-bottom: 15px;
+            font-family: 'Creepster', cursive;
+            border-bottom: 1px solid #ff6600;
+            padding-bottom: 5px;
+        }
+
+        .shop-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .shop-item {
+            background: rgba(138, 3, 3, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #ff6600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .shop-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(255, 0, 0, 0.3);
+        }
+
+        .item-image {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 10px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            border: 2px solid #ff6600;
+            border-radius: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .item-name {
+            font-size: 18px;
+            color: #ff6600;
+            margin-bottom: 5px;
+            font-family: 'Creepster', cursive;
+            text-align: center;
+        }
+
+        .item-description {
+            font-size: 12px;
+            color: #ccc;
+            margin-bottom: 10px;
+            text-align: center;
+            min-height: 40px;
+        }
+
+        .item-stats {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 10px;
+            text-align: center;
+            font-family: 'Audiowide', cursive;
+        }
+
+        .item-price {
+            font-size: 16px;
+            color: #ffcc00;
+            font-family: 'Creepster', cursive;
+            margin-bottom: 10px;
+        }
+
+        .buy-btn {
+            background: linear-gradient(45deg, #ffcc00, #ff6600);
+            border: none;
+            color: #000;
+            padding: 8px 15px;
+            font-size: 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Creepster', cursive;
+            width: 100%;
+        }
+
+        .buy-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .buy-btn.owned {
+            background: linear-gradient(45deg, #00cc00, #009900);
+            color: white;
+        }
+
+        .buy-btn.equipped {
+            background: linear-gradient(45deg, #ff0000, #8a0303);
+            color: white;
+        }
+
+        #close-shop {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #ff6600;
+            color: #ff6600;
+            font-size: 24px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 13;
+        }
+
+        #close-shop:hover {
+            background: rgba(255, 102, 0, 0.2);
+        }
+
+        #leaderboard-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(45deg, #3366ff, #0033cc);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(51, 102, 255, 0.7);
+            font-family: 'Creepster', cursive;
+            z-index: 4;
+            pointer-events: auto;
+            display: none;
+        }
+
+        #leaderboard-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(51, 102, 255, 0.9);
+        }
+
+        #leaderboard-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 12;
+            display: none;
+        }
+
+        #leaderboard-screen h2 {
+            font-size: 36px;
+            color: #3366ff;
+            margin-bottom: 20px;
+            font-family: 'Creepster', cursive;
+        }
+
+        .leaderboard-entry {
+            display: flex;
+            align-items: center;
+            background: rgba(51, 102, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin: 5px 0;
+            width: 80%;
+            max-width: 500px;
+            border: 1px solid #3366ff;
+        }
+
+        .leaderboard-rank {
+            font-size: 18px;
+            color: #ffcc00;
+            width: 30px;
+            font-family: 'Creepster', cursive;
+        }
+
+        .leaderboard-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 15px;
+        }
+
+        .leaderboard-name {
+            flex: 1;
+            font-size: 16px;
+            color: white;
+            font-family: 'Audiowide', cursive;
+        }
+
+        .leaderboard-score {
+            font-size: 18px;
+            color: #ff6600;
+            font-family: 'Creepster', cursive;
+        }
+
+        #close-leaderboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: none;
+            color: #3366ff;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        #daily-reward {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #ffcc00;
+            z-index: 13;
+            display: none;
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        #daily-reward h3 {
+            font-size: 24px;
+            color: #ffcc00;
+            margin-bottom: 10px;
+            font-family: 'Creepster', cursive;
+        }
+
+        #daily-reward p {
+            font-size: 18px;
+            color: white;
+            margin-bottom: 20px;
+            font-family: 'Audiowide', cursive;
+        }
+
+        #claim-reward {
+            background: linear-gradient(45deg, #ffcc00, #ff6600);
+            border: none;
+            color: #000;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-family: 'Creepster', cursive;
+            width: 100%;
+        }
+
+        #boss-health-container {
+            position: absolute;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 500px;
+            height: 25px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            border: 1px solid #ff0000;
+            overflow: hidden;
+            display: none;
+            z-index: 4;
+        }
+
+        #boss-health-bar {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #ff0000 0%, #8a0303 100%);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        #boss-name {
+            position: absolute;
+            top: -25px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 18px;
+            color: #ff0000;
+            font-family: 'Creepster', cursive;
+            text-shadow: 0 0 10px #ff0000;
+        }
+
+        #mission-container {
+            position: absolute;
+            bottom: 120px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid #00cc00;
+            display: none;
+            z-index: 4;
+            max-width: 250px;
+        }
+
+        #mission-title {
+            font-size: 16px;
+            color: #00cc00;
+            margin-bottom: 5px;
+            font-family: 'Creepster', cursive;
+        }
+
+        #mission-description {
+            font-size: 14px;
+            color: white;
+            margin-bottom: 5px;
+            font-family: 'Audiowide', cursive;
+        }
+
+        #mission-progress {
+            font-size: 12px;
+            color: #ffcc00;
+            font-family: 'Audiowide', cursive;
+        }
+
+        #mission-reward {
+            font-size: 12px;
+            color: #ff6600;
+            margin-top: 5px;
+            font-family: 'Creepster', cursive;
+        }
+
+        #notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .notification {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 4px solid #ff6600;
+            display: flex;
+            align-items: center;
+            max-width: 300px;
+            animation: slideIn 0.3s, fadeOut 0.5s 2.5s forwards;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        .notification-icon {
+            margin-right: 10px;
+            font-size: 20px;
+            color: #ff6600;
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-family: 'Creepster', cursive;
+        }
+
+        .notification-message {
+            font-size: 14px;
+            font-family: 'Audiowide', cursive;
+        }
+
+        .close-notification {
+            margin-left: 10px;
+            cursor: pointer;
+            color: #ccc;
+        }
+
+        #feedback-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 14;
+            display: none;
+        }
+
+        #feedback-container h2 {
+            font-size: 36px;
+            color: #ff6600;
+            margin-bottom: 20px;
+            font-family: 'Creepster', cursive;
+        }
+
+        #feedback-form {
+            width: 90%;
+            max-width: 500px;
+            background: rgba(20, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #ff6600;
+        }
+
+        #feedback-text {
+            width: 100%;
+            height: 150px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #ff6600;
+            color: white;
+            font-family: 'Audiowide', cursive;
+            resize: none;
+        }
+
+        #send-feedback {
+            background: linear-gradient(45deg, #ff6600, #ff0000);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-family: 'Creepster', cursive;
+            width: 100%;
+        }
+
+        #close-feedback {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: none;
+            color: #ff6600;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        #ads-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            display: none;
+        }
+
+        #watch-ad-btn {
+            background: linear-gradient(45deg, #00cc00, #009900);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            font-family: 'Creepster', cursive;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        #watch-ad-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.7);
+        }
+
+        .ad-label {
+            font-size: 12px;
+            color: #ccc;
+            font-family: 'Audiowide', cursive;
+        }
+
+        #character-display {
+            position: absolute;
+            bottom: 150px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid #3366ff;
+            display: none;
+            z-index: 4;
+            max-width: 200px;
+        }
+
+        #character-name {
+            font-size: 16px;
+            color: #3366ff;
+            margin-bottom: 5px;
+            font-family: 'Creepster', cursive;
+        }
+
+        #character-description {
+            font-size: 12px;
+            color: #ccc;
+            font-family: 'Audiowide', cursive;
+        }
+
+        #character-image {
+            width: 100%;
+            height: 100px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            margin-bottom: 10px;
+        }
+
+        #feedback-btn {
+            position: absolute;
+            bottom: 70px;
+            right: 20px;
+            background: linear-gradient(45deg, #ff00ff, #cc00cc);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.7);
+            font-family: 'Creepster', cursive;
+            z-index: 4;
+            pointer-events: auto;
+            display: none;
+        }
+
+        #feedback-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.9);
+        }
+
+        @media (max-width: 768px) {
+            #score-display {
+                font-size: 18px;
+                top: 10px;
+                left: 10px;
+            }
+
+            #coins-display {
+                font-size: 16px;
+                top: 50px;
+                left: 10px;
+            }
+
+            #level-display {
+                font-size: 16px;
+                top: 50px;
+                right: 10px;
+            }
+
+            #health-bar-container {
+                width: 150px;
+                height: 25px;
+                top: 10px;
+                right: 10px;
+            }
+
+            #game-over h1 {
+                font-size: 48px;
+            }
+
+            #final-score {
+                font-size: 20px;
+            }
+
+            #start-screen h1 {
+                font-size: 48px;
+            }
+
+            #game-title {
+                font-size: 20px;
+            }
+
+            #game-by, #game-company {
+                font-size: 16px;
+            }
+
+            #start-screen p {
+                font-size: 16px;
+            }
+
+            #mobile-controls {
+                display: flex;
+            }
+
+            #shop-btn, #leaderboard-btn, #feedback-btn {
+                padding: 8px 15px;
+                font-size: 14px;
+                bottom: 100px;
+            }
+
+            #leaderboard-btn {
+                bottom: 160px;
+            }
+
+            #feedback-btn {
+                bottom: 220px;
+            }
+
+            #mission-container {
+                bottom: 200px;
+                left: 10px;
+                max-width: 200px;
+            }
+
+            #character-display {
+                bottom: 250px;
+                left: 10px;
+                max-width: 150px;
+            }
+
+            .shop-items {
+                grid-template-columns: 1fr;
+            }
+
+            .shop-item {
+                padding: 10px;
+            }
+
+            .item-image {
+                width: 80px;
+                height: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="starfield"></div>
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="ui-container">
+            <div id="user-info" style="display: none;">
+                <img id="user-avatar" src="">
+                <span id="user-name"></span>
+                <button id="logout-btn">Logout</button>
+            </div>
+            
+            <div id="score-display">SOULS: 0</div>
+            <div id="coins-display">COINS: 0</div>
+            <div id="level-display">NIGHTMARE LEVEL: 1</div>
+            <div id="health-bar-container">
+                <div id="health-bar"></div>
+                <div id="health-text">100%</div>
+            </div>
+            
+            <div id="boss-health-container">
+                <div id="boss-health-bar"></div>
+                <div id="boss-name">BOSS</div>
+            </div>
+            
+            <div id="mission-container">
+                <div id="mission-title">DAILY MISSION</div>
+                <div id="mission-description">Kill 10 enemies</div>
+                <div id="mission-progress">Progress: 0/10</div>
+                <div id="mission-reward">Reward: 100 coins</div>
+            </div>
+            
+            <div id="character-display">
+                <div id="character-image"></div>
+                <div id="character-name">CAPTAIN</div>
+                <div id="character-description">Last survivor of Nebula's Revenge</div>
+            </div>
+            
+            <div id="powerup-indicator">
+                <div id="powerup-icon"></div>
+                <div id="powerup-timer">0s</div>
+            </div>
+            
+            <button id="shop-btn">SHOP</button>
+            <button id="leaderboard-btn">LEADERBOARD</button>
+            <button id="feedback-btn">FEEDBACK</button>
+            
+            <div id="ads-container">
+                <button id="watch-ad-btn">WATCH AD FOR 50 COINS</button>
+                <div class="ad-label">Support the game by watching an ad</div>
+            </div>
+            
+            <div id="mobile-controls">
+                <div class="control-btn" id="left-btn">←</div>
+                <div class="control-btn" id="right-btn">→</div>
+                <div class="control-btn" id="up-btn">↑</div>
+                <div class="control-btn" id="down-btn">↓</div>
+                <div class="control-btn" id="fire-btn">☠</div>
+            </div>
+        </div>
+        
+        <div id="login-container">
+            <h2>COSMIC HORROR</h2>
+            <p>Login to save your progress and compete on leaderboards</p>
+            <button id="login-btn">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google logo">
+                Sign in with Google
+            </button>
+            <button id="play-offline-btn">Play Offline</button>
+        </div>
+        
+        <div id="start-screen">
+            <h1>COSMIC HORROR</h1>
+            <div id="game-title">The Last Space Survivor</div>
+            <div id="game-by">Developed by Manish Pokhrel & Aadarsha Bashayal</div>
+            <div id="game-company">Bashyal Team Productions</div>
+            <p>You are the last survivor of the spaceship "Nebula's Revenge".<br>
+            The cosmic horrors have boarded your ship.<br>
+            Fight your way through the nightmare levels and survive as long as you can.<br>
+            Use arrow keys to move and spacebar to fire. Collect dark relics for unholy powers.</p>
+            <button id="start-btn">BEGIN NIGHTMARE</button>
+        </div>
+        
+        <div id="game-over">
+            <h1>YOU DIED</h1>
+            <div id="final-score">SOULS COLLECTED: 0</div>
+            <div id="final-coins">COINS EARNED: 0</div>
+            <button id="restart-btn">TRY AGAIN</button>
+            <button id="menu-btn">MAIN MENU</button>
+        </div>
+        
+        <div id="shop-screen">
+            <h2>DARK MARKET</h2>
+            
+            <div class="shop-category">
+                <div class="category-title">SHIPS</div>
+                <div class="shop-items">
+                    <div class="shop-item">
+                        <div class="item-image" style="background-image: url('https://cdn-icons-png.flaticon.com/512/2738/2738730.png');"></div>
+                        <div class="item-name">Nebula's Revenge</div>
+                        <div class="item-description">Standard issue ship with balanced stats</div>
+                        <div class="item-stats">Speed: 8 | Fire Rate: 300ms | Health: 100</div>
+                        <div class="item-price">Starting Ship</div>
+                        <button class="buy-btn equipped" data-ship="default">EQUIPPED</button>
+                    </div>
+                    <div class="shop-item">
+                        <div class="item-image" style="background-image: url('https://cdn-icons-png.flaticon.com/512/2738/2738740.png');"></div>
+                        <div class="item-name">Phantom Striker</div>
+                        <div class="item-description">Fast and agile but fragile</div>
+                        <div class="item-stats">Speed: 10 | Fire Rate: 250ms | Health: 80</div>
+                        <div class="item-price">500 coins</div>
+                        <button class="buy-btn" data-ship="fast">BUY</button>
+                    </div>
+                    <div class="shop-item">
+                        <div class="item-image" style="background-image: url('https://cdn-icons-png.flaticon.com/512/2738/2738750.png');"></div>
+                        <div class="item-name">Titan Defender</div>
+                        <div class="item-description">Slow but heavily armored</div>
+                        <div class="item-stats">Speed: 6 | Fire Rate: 400ms | Health: 150</div>
+                        <div class="item-price">500 coins</div>
+                        <button class="buy-btn" data-ship="tank">BUY</button>
+                    </div>
+                    <div class="shop-item">
+                        <div class="item-image" style="background-image: url('https://cdn-icons-png.flaticon.com/512/2738/2738760.png');"></div>
+                        <div class="item-name">Doom Bringer</div>
+                        <div class="item-description">Triple firepower with standard stats</div>
+                        <div class="item-stats">Speed: 8 | Fire Rate: 200ms | Health: 100</div>
+                        <div class="item-price">1000 coins</div>
+                        <button class="buy-btn" data-ship="doom">BUY</button>
+                    </div>
+                    <div class="shop-item">
+                        <div class="item-image" style="background-image: url('https://cdn-icons-png.flaticon.com/512/2738/2738770.png');"></div>
+                        <div class="item-name">Void Reaper</div>
+                        <div class="item-description">Elite ship with all-around upgrades</div>
+                        <div class="item-stats">Speed: 9 | Fire Rate: 150ms | Health: 120</div>
+                        <div class="item-price">2000 coins</div>
+                        <button class="buy-btn" data-ship="void">BUY</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="shop-category">
+                <div class="category-title">UPGRADES</div>
+                <div class="shop-items">
+                    <div class="shop-item">
+                        <div class="item-image" style="background-image: url('https://cdn-icons-png.flaticon.com/512/2738/2738876.png');"></div>
+                        <div class="item-name">Health Boost</div>
+                        <div class="item-description">Permanently increase max health by 20%</div>
+                        <div class="item-price">300 coins</div>
+                        <button class="buy-btn" data-upgrade="health">BUY</button>
+                    </div>
+                    <div class="shop-item">
+                        <div class="item-image" style="background-image: url('https://cdn-icons-png.flaticon.com/512/2738/2738887.png');"></div>
+                        <div class="item-name">Fire Rate</div>
+                        <div class="item-description">Permanently increase fire rate by 15%</div>
+                        <div class="item-price">300 coins</div>
+                        <button class="buy-btn" data-upgrade="firerate">BUY</button>
+                    </div>
+                    <div class="shop-item">
+                        <div class="item-image" style="background-image: url('https://cdn-icons-png.flaticon.com/512/2738/2738895.png');"></div>
+                        <div class="item-name">Speed Boost</div>
+                        <div class="item-description">Permanently increase speed by 15%</div>
+                        <div class="item-price">300 coins</div>
+                        <button class="buy-btn" data-upgrade="speed">BUY</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="shop-category">
+                <div class="category-title">CHARACTERS</div>
+                <div class="shop-items">
+                    <div class="shop-item">
+                        <div class="item-image" style="background-image: url('https://cdn-icons-png.flaticon.com/512/4333/4333609.png');"></div>
+                        <div class="item-name">Captain</div>
+                        <div class="item-description">Standard character with no bonuses</div>
+                        <div class="item-price">Free</div>
+                        <button class="buy-btn equipped" data-character="captain">EQUIPPED</button>
+                    </div>
+                    <div class="shop-item">
+                        <div class="item-image" style="background-image: url('https://cdn-icons-png.flaticon.com/512/4333/4333607.png');"></div>
+                        <div class="item-name">Necromancer</div>
+                        <div class="item-description">+10% soul collection</div>
+                        <div class="item-price">500 coins</div>
+                        <button class="buy-btn" data-character="necromancer">BUY</button>
+                    </div>
+                    <div class="shop-item">
+                        <div class="item-image" style="background-image: url('https://cdn-icons-png.flaticon.com/512/4333/4333608.png');"></div>
+                        <div class="item-name">Mercenary</div>
+                        <div class="item-description">+10% coin rewards</div>
+                        <div class="item-price">500 coins</div>
+                        <button class="buy-btn" data-character="mercenary">BUY</button>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="close-shop">✕</button>
+        </div>
+        
+        <div id="leaderboard-screen">
+            <h2>LEADERBOARD</h2>
+            <div id="leaderboard-entries">
+                <!-- Leaderboard entries will be added here dynamically -->
+            </div>
+            <button id="close-leaderboard">✕</button>
+        </div>
+        
+        <div id="daily-reward">
+            <h3>DAILY REWARD</h3>
+            <p>Come back tomorrow for another reward!</p>
+            <button id="claim-reward">CLAIM 100 COINS</button>
+        </div>
+        
+        <div id="feedback-container">
+            <h2>SEND FEEDBACK</h2>
+            <div id="feedback-form">
+                <textarea id="feedback-text" placeholder="Tell us about your experience..."></textarea>
+                <button id="send-feedback">SEND FEEDBACK</button>
+            </div>
+            <button id="close-feedback">✕</button>
+        </div>
+        
+        <div id="notification-container"></div>
+    </div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxEtuj7pNCi2yU6aB6-2RSCJm7a8OVyE0",
+            authDomain: "spaceshooter-a4bc0.firebaseapp.com",
+            projectId: "spaceshooter-a4bc0",
+            storageBucket: "spaceshooter-a4bc0.appspot.com",
+            messagingSenderId: "71078673359",
+            appId: "1:71078673359:web:831837c9ef55935f0270ba",
+            measurementId: "G-TR3SSTCT7Y"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const messaging = firebase.messaging();
+        const analytics = firebase.analytics();
+
+        // Unity Ads Configuration
+        const unityAdsConfig = {
+            gameId: '5824043',
+            onLoad: () => {
+                console.log('Unity Ads SDK loaded');
+                document.getElementById('ads-container').style.display = 'flex';
+            },
+            onError: (message) => {
+                console.error('Unity Ads Error:', message);
+            }
+        };
+
+        // Initialize Unity Ads
+        if (typeof unityAds !== 'undefined') {
+            unityAds.init(unityAdsConfig);
+        }
+
+        // Game Variables
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score-display');
+        const coinsDisplay = document.getElementById('coins-display');
+        const levelDisplay = document.getElementById('level-display');
+        const healthBar = document.getElementById('health-bar');
+        const healthText = document.getElementById('health-text');
+        const gameOverScreen = document.getElementById('game-over');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const restartBtn = document.getElementById('restart-btn');
+        const menuBtn = document.getElementById('menu-btn');
+        const startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('start-btn');
+        const starfield = document.getElementById('starfield');
+        const powerupIndicator = document.getElementById('powerup-indicator');
+        const powerupIcon = document.getElementById('powerup-icon');
+        const powerupTimer = document.getElementById('powerup-timer');
+        const loginContainer = document.getElementById('login-container');
+        const loginBtn = document.getElementById('login-btn');
+        const playOfflineBtn = document.getElementById('play-offline-btn');
+        const userInfo = document.getElementById('user-info');
+        const userAvatar = document.getElementById('user-avatar');
+        const userName = document.getElementById('user-name');
+        const logoutBtn = document.getElementById('logout-btn');
+        const shopBtn = document.getElementById('shop-btn');
+        const shopScreen = document.getElementById('shop-screen');
+        const closeShop = document.getElementById('close-shop');
+        const leaderboardBtn = document.getElementById('leaderboard-btn');
+        const leaderboardScreen = document.getElementById('leaderboard-screen');
+        const closeLeaderboard = document.getElementById('close-leaderboard');
+        const dailyReward = document.getElementById('daily-reward');
+        const claimReward = document.getElementById('claim-reward');
+        const bossHealthContainer = document.getElementById('boss-health-container');
+        const bossHealthBar = document.getElementById('boss-health-bar');
+        const bossName = document.getElementById('boss-name');
+        const missionContainer = document.getElementById('mission-container');
+        const missionTitle = document.getElementById('mission-title');
+        const missionDescription = document.getElementById('mission-description');
+        const missionProgress = document.getElementById('mission-progress');
+        const missionReward = document.getElementById('mission-reward');
+        const characterDisplay = document.getElementById('character-display');
+        const characterImage = document.getElementById('character-image');
+        const characterName = document.getElementById('character-name');
+        const characterDesc = document.getElementById('character-description');
+        const feedbackBtn = document.getElementById('feedback-btn');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const feedbackText = document.getElementById('feedback-text');
+        const sendFeedbackBtn = document.getElementById('send-feedback');
+        const closeFeedback = document.getElementById('close-feedback');
+        const watchAdBtn = document.getElementById('watch-ad-btn');
+        const adsContainer = document.getElementById('ads-container');
+        
+        // Mobile controls
+        const leftBtn = document.getElementById('left-btn');
+        const rightBtn = document.getElementById('right-btn');
+        const upBtn = document.getElementById('up-btn');
+        const downBtn = document.getElementById('down-btn');
+        const fireBtn = document.getElementById('fire-btn');
+        
+        // Game state
+        let gameRunning = false;
+        let score = 0;
+        let coins = 0;
+        let health = 100;
+        let level = 1;
+        let enemiesDefeated = 0;
+        let powerupActive = false;
+        let powerupType = '';
+        let powerupEndTime = 0;
+        let horrorEffectTimer = 0;
+        let timestamp = 0;
+        let isLoggedIn = false;
+        let userData = {};
+        let currentMission = null;
+        let missionProgressCount = 0;
+        let bossActive = false;
+        let boss = null;
+        let characterType = 'captain';
+        let upgrades = {
+            health: 1,
+            speed: 1,
+            firerate: 1
+        };
+        
+        // Player
+        const player = {
+            x: 0,
+            y: 0,
+            width: 70,
+            height: 100,
+            speed: 8,
+            isMovingLeft: false,
+            isMovingRight: false,
+            isMovingUp: false,
+            isMovingDown: false,
+            isFiring: false,
+            lastFired: 0,
+            fireRate: 300,
+            color: '#8a0303',
+            image: new Image(),
+            engineGlow: 0,
+            shipType: 'default',
+            unlockedShips: ['default'],
+            characterBonuses: {
+                soulMultiplier: 1,
+                coinMultiplier: 1
+            }
+        };
+        player.image.src = 'https://cdn-icons-png.flaticon.com/512/2738/2738730.png';
+        
+        // Ship types
+        const shipTypes = {
+            'default': {
+                name: 'Nebula\'s Revenge',
+                image: 'https://cdn-icons-png.flaticon.com/512/2738/2738730.png',
+                speed: 8,
+                fireRate: 300,
+                health: 100,
+                price: 0
+            },
+            'fast': {
+                name: 'Phantom Striker',
+                image: 'https://cdn-icons-png.flaticon.com/512/2738/2738740.png',
+                speed: 10,
+                fireRate: 250,
+                health: 80,
+                price: 500
+            },
+            'tank': {
+                name: 'Titan Defender',
+                image: 'https://cdn-icons-png.flaticon.com/512/2738/2738750.png',
+                speed: 6,
+                fireRate: 400,
+                health: 150,
+                price: 500
+            },
+            'doom': {
+                name: 'Doom Bringer',
+                image: 'https://cdn-icons-png.flaticon.com/512/2738/2738760.png',
+                speed: 8,
+                fireRate: 200,
+                health: 100,
+                price: 1000
+            },
+            'void': {
+                name: 'Void Reaper',
+                image: 'https://cdn-icons-png.flaticon.com/512/2738/2738770.png',
+                speed: 9,
+                fireRate: 150,
+                health: 120,
+                price: 2000
+            }
+        };
+        
+        // Character types
+        const characterTypes = {
+            'captain': {
+                name: 'CAPTAIN',
+                image: 'https://cdn-icons-png.flaticon.com/512/4333/4333609.png',
+                description: 'Last survivor of Nebula\'s Revenge',
+                soulMultiplier: 1,
+                coinMultiplier: 1,
+                price: 0
+            },
+            'necromancer': {
+                name: 'NECROMANCER',
+                image: 'https://cdn-icons-png.flaticon.com/512/4333/4333607.png',
+                description: '+10% soul collection',
+                soulMultiplier: 1.1,
+                coinMultiplier: 1,
+                price: 500
+            },
+            'mercenary': {
+                name: 'MERCENARY',
+                image: 'https://cdn-icons-png.flaticon.com/512/4333/4333608.png',
+                description: '+10% coin rewards',
+                soulMultiplier: 1,
+                coinMultiplier: 1.1,
+                price: 500
+            }
+        };
+        
+        // Bullets
+        let bullets = [];
+        const bulletSpeed = 12;
+        const bulletWidth = 8;
+        const bulletHeight = 20;
+        
+        // Enemies
+        let enemies = [];
+        const enemySpeed = 2;
+        let enemySpawnRate = 2000;
+        let lastEnemySpawn = 0;
+        
+        // Power-ups
+        let powerups = [];
+        const powerupSpawnRate = 10000;
+        let lastPowerupSpawn = 0;
+        
+        // Explosions
+        let explosions = [];
+        
+        // Blood particles
+        let bloodParticles = [];
+
+        // Game setup
+        function initGame() {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            createStarfield();
+            
+            player.x = canvas.width / 2 - player.width / 2;
+            player.y = canvas.height - player.height - 20;
+            
+            // Event listeners
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+            
+            leftBtn.addEventListener('touchstart', () => player.isMovingLeft = true);
+            leftBtn.addEventListener('touchend', () => player.isMovingLeft = false);
+            rightBtn.addEventListener('touchstart', () => player.isMovingRight = true);
+            rightBtn.addEventListener('touchend', () => player.isMovingRight = false);
+            upBtn.addEventListener('touchstart', () => player.isMovingUp = true);
+            upBtn.addEventListener('touchend', () => player.isMovingUp = false);
+            downBtn.addEventListener('touchstart', () => player.isMovingDown = true);
+            downBtn.addEventListener('touchend', () => player.isMovingDown = false);
+            fireBtn.addEventListener('touchstart', () => player.isFiring = true);
+            fireBtn.addEventListener('touchend', () => player.isFiring = false);
+            
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('click', handleMouseClick);
+            
+            startBtn.addEventListener('click', startGame);
+            restartBtn.addEventListener('click', restartGame);
+            menuBtn.addEventListener('click', returnToMenu);
+            
+            loginBtn.addEventListener('click', signInWithGoogle);
+            playOfflineBtn.addEventListener('click', playOffline);
+            logoutBtn.addEventListener('click', signOut);
+            
+            shopBtn.addEventListener('click', openShop);
+            closeShop.addEventListener('click', closeShopScreen);
+            leaderboardBtn.addEventListener('click', openLeaderboard);
+            closeLeaderboard.addEventListener('click', closeLeaderboardScreen);
+            claimReward.addEventListener('click', claimDailyReward);
+            
+            feedbackBtn.addEventListener('click', openFeedback);
+            closeFeedback.addEventListener('click', closeFeedbackScreen);
+            sendFeedbackBtn.addEventListener('click', sendFeedback);
+            
+            watchAdBtn.addEventListener('click', showRewardedAd);
+            
+            // Initialize Firebase messaging
+            initMessaging();
+            
+            // Check auth state
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    // User is signed in
+                    isLoggedIn = true;
+                    userInfo.style.display = 'flex';
+                    userAvatar.src = user.photoURL || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+                    userName.textContent = user.displayName || 'Player';
+                    loginContainer.style.display = 'none';
+                    
+                    // Load user data
+                    loadUserData(user.uid);
+                } else {
+                    // User is signed out
+                    isLoggedIn = false;
+                    userInfo.style.display = 'none';
+                    loginContainer.style.display = 'flex';
+                    
+                    // Try to load from local storage
+                    loadLocalData();
+                }
+            });
+            
+            // Initialize shop buttons
+            document.querySelectorAll('.buy-btn[data-ship]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const shipType = this.getAttribute('data-ship');
+                    if (this.classList.contains('owned')) {
+                        equipShip(shipType);
+                    } else {
+                        buyShip(shipType);
+                    }
+                });
+            });
+            
+            // Initialize character buttons
+            document.querySelectorAll('.buy-btn[data-character]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const charType = this.getAttribute('data-character');
+                    if (this.classList.contains('owned')) {
+                        equipCharacter(charType);
+                    } else {
+                        buyCharacter(charType);
+                    }
+                });
+            });
+            
+            // Initialize upgrade buttons
+            document.querySelectorAll('.buy-btn[data-upgrade]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const upgradeType = this.getAttribute('data-upgrade');
+                    buyUpgrade(upgradeType);
+                });
+            });
+            
+            // Initialize missions
+            generateDailyMission();
+            
+            // Initialize character display
+            updateCharacterDisplay();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function initMessaging() {
+            // Request permission for notifications
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    console.log('Notification permission granted.');
+                    
+                    // Get FCM token
+                    messaging.getToken({ vapidKey: 'BL1Hm5Q7q6vJ7XQ9X8Q3QkZv9QkZv9QkZv9QkZv9QkZv9QkZv9QkZv9QkZv9QkZv9QkZv9QkZv9Qk' }).then((currentToken) => {
+                        if (currentToken) {
+                            console.log('FCM token:', currentToken);
+                            if (isLoggedIn && auth.currentUser) {
+                                // Save token to user document
+                                db.collection('users').doc(auth.currentUser.uid).update({
+                                    fcmToken: currentToken
+                                }).catch(error => {
+                                    console.error('Error saving FCM token:', error);
+                                });
+                            }
+                        } else {
+                            console.log('No registration token available. Request permission to generate one.');
+                        }
+                    }).catch((err) => {
+                        console.log('An error occurred while retrieving token. ', err);
+                    });
+                    
+                    // Handle incoming messages
+                    messaging.onMessage((payload) => {
+                        console.log('Message received. ', payload);
+                        showNotification(payload.notification.title, payload.notification.body);
+                    });
+                } else {
+                    console.log('Unable to get permission to notify.');
+                }
+            }).catch(err => {
+                console.log('Error getting notification permission:', err);
+            });
+        }
+        
+        function showNotification(title, message) {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.innerHTML = `
+                <div class="notification-icon">☠</div>
+                <div class="notification-content">
+                    <div class="notification-title">${title}</div>
+                    <div class="notification-message">${message}</div>
+                </div>
+                <div class="close-notification">✕</div>
+            `;
+            
+            document.getElementById('notification-container').appendChild(notification);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+            
+            // Close button
+            notification.querySelector('.close-notification').addEventListener('click', () => {
+                notification.remove();
+            });
+        }
+        
+        function signInWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider)
+                .then((result) => {
+                    // User signed in
+                    console.log('User signed in:', result.user);
+                    analytics.logEvent('login', { method: 'google' });
+                    
+                    // Check if user exists in Firestore
+                    const userRef = db.collection('users').doc(result.user.uid);
+                    userRef.get().then(doc => {
+                        if (!doc.exists) {
+                            // New user - create document
+                            userRef.set({
+                                name: result.user.displayName,
+                                email: result.user.email,
+                                photoURL: result.user.photoURL,
+                                coins: 0,
+                                highScore: 0,
+                                unlockedShips: ['default'],
+                                currentShip: 'default',
+                                unlockedCharacters: ['captain'],
+                                currentCharacter: 'captain',
+                                upgrades: {
+                                    health: 1,
+                                    speed: 1,
+                                    firerate: 1
+                                },
+                                lastLogin: new Date(),
+                                createdAt: new Date()
+                            }).then(() => {
+                                loadUserData(result.user.uid);
+                                checkDailyReward();
+                            });
+                        } else {
+                            // Existing user - update last login
+                            userRef.update({
+                                lastLogin: new Date()
+                            }).then(() => {
+                                loadUserData(result.user.uid);
+                                checkDailyReward();
+                            });
+                        }
+                    });
+                })
+                .catch((error) => {
+                    console.error('Error signing in:', error);
+                    showNotification('Login Failed', 'Could not sign in with Google');
+                });
+        }
+        
+        function signOut() {
+            auth.signOut().then(() => {
+                console.log('User signed out');
+                saveLocalData();
+            }).catch((error) => {
+                console.error('Error signing out:', error);
+            });
+        }
+        
+        function playOffline() {
+            loginContainer.style.display = 'none';
+            loadLocalData();
+            showNotification('Offline Mode', 'Your progress will be saved locally');
+        }
+        
+        function loadUserData(userId) {
+            db.collection('users').doc(userId).get()
+                .then(doc => {
+                    if (doc.exists) {
+                        userData = doc.data();
+                        coins = userData.coins || 0;
+                        coinsDisplay.textContent = `COINS: ${coins}`;
+                        
+                        player.unlockedShips = userData.unlockedShips || ['default'];
+                        if (userData.currentShip) {
+                            equipShip(userData.currentShip, false);
+                        }
+                        
+                        if (userData.unlockedCharacters) {
+                            player.unlockedCharacters = userData.unlockedCharacters;
+                        }
+                        
+                        if (userData.currentCharacter) {
+                            equipCharacter(userData.currentCharacter, false);
+                        }
+                        
+                        if (userData.upgrades) {
+                            upgrades = userData.upgrades;
+                            applyUpgrades();
+                        }
+                        
+                        // Update shop buttons
+                        updateShopButtons();
+                        
+                        // Check for daily reward
+                        checkDailyReward();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading user data:', error);
+                });
+        }
+        
+        function saveUserData() {
+            if (isLoggedIn && auth.currentUser) {
+                const data = {
+                    coins: coins,
+                    highScore: Math.max(userData.highScore || 0, score),
+                    unlockedShips: player.unlockedShips,
+                    currentShip: player.shipType,
+                    unlockedCharacters: player.unlockedCharacters || ['captain'],
+                    currentCharacter: characterType,
+                    upgrades: upgrades,
+                    lastPlayed: new Date()
+                };
+                
+                db.collection('users').doc(auth.currentUser.uid).update(data)
+                    .catch(error => {
+                        console.error('Error saving user data:', error);
+                    });
+            }
+        }
+        
+        function loadLocalData() {
+            const savedData = localStorage.getItem('cosmicHorrorSave');
+            if (savedData) {
+                try {
+                    const data = JSON.parse(savedData);
+                    coins = data.coins || 0;
+                    coinsDisplay.textContent = `COINS: ${coins}`;
+                    
+                    player.unlockedShips = data.unlockedShips || ['default'];
+                    if (data.currentShip) {
+                        equipShip(data.currentShip, false);
+                    }
+                    
+                    player.unlockedCharacters = data.unlockedCharacters || ['captain'];
+                    if (data.currentCharacter) {
+                        equipCharacter(data.currentCharacter, false);
+                    }
+                    
+                    if (data.upgrades) {
+                        upgrades = data.upgrades;
+                        applyUpgrades();
+                    }
+                    
+                    // Update shop buttons
+                    updateShopButtons();
+                    
+                    // Check for daily reward
+                    checkDailyReward();
+                } catch (e) {
+                    console.error('Error loading local data:', e);
+                }
+            }
+        }
+        
+        function saveLocalData() {
+            const data = {
+                coins: coins,
+                unlockedShips: player.unlockedShips,
+                currentShip: player.shipType,
+                unlockedCharacters: player.unlockedCharacters || ['captain'],
+                currentCharacter: characterType,
+                upgrades: upgrades,
+                lastSaved: new Date()
+            };
+            
+            localStorage.setItem('cosmicHorrorSave', JSON.stringify(data));
+        }
+        
+        function buyShip(shipType) {
+            const ship = shipTypes[shipType];
+            if (!ship) return;
+            
+            if (coins >= ship.price) {
+                coins -= ship.price;
+                coinsDisplay.textContent = `COINS: ${coins}`;
+                
+                player.unlockedShips.push(shipType);
+                
+                // Save to database or local storage
+                if (isLoggedIn && auth.currentUser) {
+                    db.collection('users').doc(auth.currentUser.uid).update({
+                        coins: coins,
+                        unlockedShips: player.unlockedShips
+                    }).catch(error => {
+                        console.error('Error updating user data:', error);
+                    });
+                } else {
+                    saveLocalData();
+                }
+                
+                // Equip the new ship
+                equipShip(shipType);
+                
+                // Update shop buttons
+                updateShopButtons();
+                
+                showNotification('Ship Unlocked', `You've unlocked the ${ship.name}!`);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-unlock-game-notification-253.mp3');
+            } else {
+                showNotification('Not Enough Coins', `You need ${ship.price - coins} more coins to buy this ship`);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-explosion-2759.mp3');
+            }
+        }
+        
+        function equipShip(shipType, showNotification = true) {
+            const ship = shipTypes[shipType];
+            if (!ship || !player.unlockedShips.includes(shipType)) return;
+            
+            player.shipType = shipType;
+            player.image.src = ship.image;
+            player.speed = 8 * upgrades.speed;
+            player.fireRate = 300 / upgrades.firerate;
+            health = ship.health * upgrades.health;
+            updateHealthBar();
+            
+            // Update current ship in database or local storage
+            if (isLoggedIn && auth.currentUser) {
+                db.collection('users').doc(auth.currentUser.uid).update({
+                    currentShip: shipType
+                }).catch(error => {
+                    console.error('Error updating user data:', error);
+                });
+            } else {
+                saveLocalData();
+            }
+            
+            // Update shop buttons
+            updateShopButtons();
+            
+            if (showNotification) {
+                showNotification('Ship Equipped', `You're now using the ${ship.name}`);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3');
+            }
+        }
+        
+        function buyCharacter(charType) {
+            const character = characterTypes[charType];
+            if (!character) return;
+            
+            if (coins >= character.price) {
+                coins -= character.price;
+                coinsDisplay.textContent = `COINS: ${coins}`;
+                
+                player.unlockedCharacters.push(charType);
+                
+                // Save to database or local storage
+                if (isLoggedIn && auth.currentUser) {
+                    db.collection('users').doc(auth.currentUser.uid).update({
+                        coins: coins,
+                        unlockedCharacters: player.unlockedCharacters
+                    }).catch(error => {
+                        console.error('Error updating user data:', error);
+                    });
+                } else {
+                    saveLocalData();
+                }
+                
+                // Equip the new character
+                equipCharacter(charType);
+                
+                // Update shop buttons
+                updateShopButtons();
+                
+                showNotification('Character Unlocked', `You've unlocked the ${character.name}!`);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-unlock-game-notification-253.mp3');
+            } else {
+                showNotification('Not Enough Coins', `You need ${character.price - coins} more coins to buy this character`);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-explosion-2759.mp3');
+            }
+        }
+        
+        function equipCharacter(charType, showNotification = true) {
+            const character = characterTypes[charType];
+            if (!character || !player.unlockedCharacters.includes(charType)) return;
+            
+            characterType = charType;
+            player.characterBonuses.soulMultiplier = character.soulMultiplier;
+            player.characterBonuses.coinMultiplier = character.coinMultiplier;
+            
+            // Update display
+            updateCharacterDisplay();
+            
+            // Update current character in database or local storage
+            if (isLoggedIn && auth.currentUser) {
+                db.collection('users').doc(auth.currentUser.uid).update({
+                    currentCharacter: charType
+                }).catch(error => {
+                    console.error('Error updating user data:', error);
+                });
+            } else {
+                saveLocalData();
+            }
+            
+            // Update shop buttons
+            updateShopButtons();
+            
+            if (showNotification) {
+                showNotification('Character Equipped', `You're now using the ${character.name}`);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3');
+            }
+        }
+        
+        function buyUpgrade(upgradeType) {
+            const upgradeCost = 300 + (upgrades[upgradeType] - 1) * 300;
+            
+            if (coins >= upgradeCost) {
+                coins -= upgradeCost;
+                coinsDisplay.textContent = `COINS: ${coins}`;
+                
+                upgrades[upgradeType] += 0.15; // 15% improvement
+                
+                // Apply upgrades to player
+                applyUpgrades();
+                
+                // Save to database or local storage
+                if (isLoggedIn && auth.currentUser) {
+                    db.collection('users').doc(auth.currentUser.uid).update({
+                        coins: coins,
+                        upgrades: upgrades
+                    }).catch(error => {
+                        console.error('Error updating user data:', error);
+                    });
+                } else {
+                    saveLocalData();
+                }
+                
+                // Update shop buttons
+                updateShopButtons();
+                
+                showNotification('Upgrade Purchased', `${upgradeType} upgraded to level ${Math.floor(upgrades[upgradeType] / 0.15)}`);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3');
+            } else {
+                showNotification('Not Enough Coins', `You need ${upgradeCost - coins} more coins for this upgrade`);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-explosion-2759.mp3');
+            }
+        }
+        
+        function applyUpgrades() {
+            const ship = shipTypes[player.shipType];
+            player.speed = ship.speed * upgrades.speed;
+            player.fireRate = ship.fireRate / upgrades.firerate;
+            health = ship.health * upgrades.health;
+            updateHealthBar();
+        }
+        
+        function updateShopButtons() {
+            // Update ship buttons
+            document.querySelectorAll('.buy-btn[data-ship]').forEach(btn => {
+                const shipType = btn.getAttribute('data-ship');
+                
+                // Reset classes
+                btn.className = 'buy-btn';
+                
+                if (shipType === player.shipType) {
+                    btn.classList.add('equipped');
+                    btn.textContent = 'EQUIPPED';
+                } else if (player.unlockedShips.includes(shipType)) {
+                    btn.classList.add('owned');
+                    btn.textContent = 'EQUIP';
+                } else {
+                    btn.textContent = `BUY (${shipTypes[shipType].price})`;
+                }
+            });
+            
+            // Update character buttons
+            document.querySelectorAll('.buy-btn[data-character]').forEach(btn => {
+                const charType = btn.getAttribute('data-character');
+                
+                // Reset classes
+                btn.className = 'buy-btn';
+                
+                if (charType === characterType) {
+                    btn.classList.add('equipped');
+                    btn.textContent = 'EQUIPPED';
+                } else if (player.unlockedCharacters.includes(charType)) {
+                    btn.classList.add('owned');
+                    btn.textContent = 'EQUIP';
+                } else {
+                    btn.textContent = `BUY (${characterTypes[charType].price})`;
+                }
+            });
+            
+            // Update upgrade buttons
+            document.querySelectorAll('.buy-btn[data-upgrade]').forEach(btn => {
+                const upgradeType = btn.getAttribute('data-upgrade');
+                const upgradeLevel = Math.floor(upgrades[upgradeType] / 0.15);
+                const upgradeCost = 300 + (upgradeLevel - 1) * 300;
+                
+                btn.textContent = `UPGRADE (${upgradeCost})`;
+                
+                // Show current level
+                const statElement = btn.parentElement.querySelector('.item-stats');
+                if (statElement) {
+                    statElement.textContent += ` | Level: ${upgradeLevel}`;
+                }
+            });
+        }
+        
+        function updateCharacterDisplay() {
+            const character = characterTypes[characterType];
+            if (!character) return;
+            
+            characterImage.style.backgroundImage = `url(${character.image})`;
+            characterName.textContent = character.name;
+            characterDesc.textContent = character.description;
+            characterDisplay.style.display = 'block';
+        }
+        
+        function openShop() {
+            shopScreen.style.display = 'flex';
+            pauseGame();
+        }
+        
+        function closeShopScreen() {
+            shopScreen.style.display = 'none';
+            resumeGame();
+        }
+        
+        function openLeaderboard() {
+            leaderboardScreen.style.display = 'flex';
+            loadLeaderboard();
+            pauseGame();
+        }
+        
+        function closeLeaderboardScreen() {
+            leaderboardScreen.style.display = 'none';
+            resumeGame();
+        }
+        
+        function openFeedback() {
+            feedbackContainer.style.display = 'flex';
+            pauseGame();
+        }
+        
+        function closeFeedbackScreen() {
+            feedbackContainer.style.display = 'none';
+            resumeGame();
+        }
+        
+        function sendFeedback() {
+            const feedback = feedbackText.value.trim();
+            if (!feedback) {
+                showNotification('Error', 'Please enter your feedback');
+                return;
+            }
+            
+            // In a real app, you would send this to your backend
+            // For now, we'll just show a notification and log it
+            console.log('Feedback submitted:', feedback);
+            
+            // Simulate sending to email
+            const emailLink = `mailto:notreplyspaceshooter@gmail.com?subject=Cosmic Horror Feedback&body=${encodeURIComponent(feedback)}`;
+            window.open(emailLink, '_blank');
+            
+            showNotification('Thank You!', 'Your feedback has been submitted');
+            feedbackText.value = '';
+            closeFeedbackScreen();
+        }
+        
+        function loadLeaderboard() {
+            const leaderboardEntries = document.getElementById('leaderboard-entries');
+            leaderboardEntries.innerHTML = '<div style="color: #ccc; margin: 20px 0;">Loading leaderboard...</div>';
+            
+            db.collection('users')
+                .orderBy('highScore', 'desc')
+                .limit(10)
+                .get()
+                .then(querySnapshot => {
+                    leaderboardEntries.innerHTML = '';
+                    
+                    if (querySnapshot.empty) {
+                        leaderboardEntries.innerHTML = '<div style="color: #ccc; margin: 20px 0;">No scores yet. Be the first!</div>';
+                        return;
+                    }
+                    
+                    let rank = 1;
+                    querySnapshot.forEach(doc => {
+                        const user = doc.data();
+                        const entry = document.createElement('div');
+                        entry.className = 'leaderboard-entry';
+                        entry.innerHTML = `
+                            <div class="leaderboard-rank">${rank}</div>
+                            <img class="leaderboard-avatar" src="${user.photoURL || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'}">
+                            <div class="leaderboard-name">${user.name || 'Anonymous'}</div>
+                            <div class="leaderboard-score">${user.highScore || 0}</div>
+                        `;
+                        
+                        // Highlight current user
+                        if (isLoggedIn && auth.currentUser && doc.id === auth.currentUser.uid) {
+                            entry.style.borderColor = '#ffcc00';
+                            entry.style.background = 'rgba(255, 204, 0, 0.1)';
+                        }
+                        
+                        leaderboardEntries.appendChild(entry);
+                        rank++;
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading leaderboard:', error);
+                    leaderboardEntries.innerHTML = '<div style="color: #ff0000; margin: 20px 0;">Error loading leaderboard</div>';
+                });
+        }
+        
+        function checkDailyReward() {
+            if (!isLoggedIn && !localStorage.getItem('cosmicHorrorSave')) return;
+            
+            const lastRewardDate = userData.lastRewardDate || localStorage.getItem('lastRewardDate');
+            const today = new Date().toDateString();
+            
+            if (lastRewardDate !== today) {
+                // Show daily reward
+                setTimeout(() => {
+                    dailyReward.style.display = 'block';
+                    pauseGame();
+                }, 1000);
+            }
+        }
+        
+        function claimDailyReward() {
+            const rewardAmount = 100;
+            coins += rewardAmount;
+            coinsDisplay.textContent = `COINS: ${coins}`;
+            
+            const today = new Date().toDateString();
+            
+            if (isLoggedIn && auth.currentUser) {
+                db.collection('users').doc(auth.currentUser.uid).update({
+                    coins: coins,
+                    lastRewardDate: today
+                }).then(() => {
+                    userData.lastRewardDate = today;
+                    dailyReward.style.display = 'none';
+                    resumeGame();
+                    showNotification('Daily Reward', `You've received ${rewardAmount} coins!`);
+                    playSound('https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3');
+                }).catch(error => {
+                    console.error('Error claiming reward:', error);
+                });
+            } else {
+                localStorage.setItem('lastRewardDate', today);
+                saveLocalData();
+                dailyReward.style.display = 'none';
+                resumeGame();
+                showNotification('Daily Reward', `You've received ${rewardAmount} coins!`);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3');
+            }
+        }
+        
+        function showRewardedAd() {
+            if (typeof unityAds !== 'undefined') {
+                unityAds.showAd('rewardedVideo', {
+                    onComplete: () => {
+                        // Reward the player
+                        const rewardAmount = 50;
+                        coins += rewardAmount;
+                        coinsDisplay.textContent = `COINS: ${coins}`;
+                        
+                        // Save coins
+                        if (isLoggedIn && auth.currentUser) {
+                            db.collection('users').doc(auth.currentUser.uid).update({
+                                coins: coins
+                            }).catch(error => {
+                                console.error('Error updating coins:', error);
+                            });
+                        } else {
+                            saveLocalData();
+                        }
+                        
+                        showNotification('Reward Granted', `You earned ${rewardAmount} coins!`);
+                        playSound('https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3');
+                    },
+                    onError: (error) => {
+                        console.error('Ad error:', error);
+                        showNotification('Ad Error', 'Could not load ad. Please try again later.');
+                    }
+                });
+            } else {
+                // Fallback if Unity Ads not available
+                const rewardAmount = 50;
+                coins += rewardAmount;
+                coinsDisplay.textContent = `COINS: ${coins}`;
+                
+                // Save coins
+                if (isLoggedIn && auth.currentUser) {
+                    db.collection('users').doc(auth.currentUser.uid).update({
+                        coins: coins
+                    }).catch(error => {
+                        console.error('Error updating coins:', error);
+                    });
+                } else {
+                    saveLocalData();
+                }
+                
+                showNotification('Reward Granted', `You earned ${rewardAmount} coins!`);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3');
+            }
+        }
+        
+        function generateDailyMission() {
+            const missionTypes = [
+                {
+                    title: "KILL STREAK",
+                    description: "Kill 10 enemies",
+                    type: "kill",
+                    target: 10,
+                    reward: Math.floor(10 + Math.random() * 20), // Random reward between 10-30
+                    progress: 0
+                },
+                {
+                    title: "SURVIVOR",
+                    description: "Survive for 2 minutes",
+                    type: "survive",
+                    target: 120000, // 2 minutes in ms
+                    reward: Math.floor(15 + Math.random() * 25), // Random reward between 15-40
+                    progress: 0,
+                    startTime: 0
+                },
+                {
+                    title: "POWER COLLECTOR",
+                    description: "Collect 3 power-ups",
+                    type: "powerup",
+                    target: 3,
+                    reward: Math.floor(12 + Math.random() * 23), // Random reward between 12-35
+                    progress: 0
+                }
+            ];
+            
+            // Get a random mission
+            const today = new Date().toDateString();
+            const lastMissionDate = localStorage.getItem('lastMissionDate');
+            let missionIndex = localStorage.getItem('currentMissionIndex');
+            
+            if (lastMissionDate !== today || !missionIndex) {
+                missionIndex = Math.floor(Math.random() * missionTypes.length);
+                localStorage.setItem('currentMissionIndex', missionIndex);
+                localStorage.setItem('lastMissionDate', today);
+            }
+            
+            currentMission = {...missionTypes[missionIndex]};
+            missionProgressCount = 0;
+            
+            // Load progress from local storage if available
+            const savedProgress = localStorage.getItem('missionProgress');
+            if (savedProgress && lastMissionDate === today) {
+                missionProgressCount = parseInt(savedProgress) || 0;
+            }
+            
+            updateMissionDisplay();
+            missionContainer.style.display = 'block';
+        }
+        
+        function updateMissionDisplay() {
+            if (!currentMission) return;
+            
+            missionTitle.textContent = currentMission.title;
+            missionDescription.textContent = currentMission.description;
+            
+            if (currentMission.type === 'survive') {
+                const seconds = Math.floor(currentMission.target / 1000);
+                missionDescription.textContent = `Survive for ${seconds} seconds`;
+                const progressSeconds = Math.floor(missionProgressCount / 1000);
+                missionProgress.textContent = `Progress: ${progressSeconds}/${seconds}s`;
+            } else {
+                missionProgress.textContent = `Progress: ${missionProgressCount}/${currentMission.target}`;
+            }
+            
+            missionReward.textContent = `Reward: ${currentMission.reward} coins`;
+        }
+        
+        function checkMissionCompletion() {
+            if (!currentMission) return;
+            
+            let completed = false;
+            
+            if (currentMission.type === 'kill' && missionProgressCount >= currentMission.target) {
+                completed = true;
+            } else if (currentMission.type === 'survive' && missionProgressCount >= currentMission.target) {
+                completed = true;
+            } else if (currentMission.type === 'powerup' && missionProgressCount >= currentMission.target) {
+                completed = true;
+            }
+            
+            if (completed) {
+                // Reward player (with character bonus)
+                const rewardAmount = Math.floor(currentMission.reward * player.characterBonuses.coinMultiplier);
+                coins += rewardAmount;
+                coinsDisplay.textContent = `COINS: ${coins}`;
+                
+                showNotification('Mission Complete', `You earned ${rewardAmount} coins!`);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3');
+                
+                // Save coins
+                if (isLoggedIn && auth.currentUser) {
+                    db.collection('users').doc(auth.currentUser.uid).update({
+                        coins: coins
+                    }).catch(error => {
+                        console.error('Error updating coins:', error);
+                    });
+                } else {
+                    saveLocalData();
+                }
+                
+                // Generate new mission
+                generateDailyMission();
+            } else {
+                // Save progress
+                localStorage.setItem('missionProgress', missionProgressCount);
+            }
+        }
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            if (gameRunning) {
+                player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+                player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+            }
+        }
+        
+        function createStarfield() {
+            starfield.innerHTML = '';
+            const starCount = Math.floor(window.innerWidth * window.innerHeight / 800);
+            
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                const size = Math.random() * 2 + 1;
+                star.style.width = `${size}px`;
+                star.style.height = `${size}px`;
+                star.style.left = `${Math.random() * 100}%`;
+                star.style.top = `${Math.random() * 100}%`;
+                star.style.setProperty('--duration', `${Math.random() * 5 + 3}s`);
+                if (Math.random() > 0.7) star.style.backgroundColor = '#8a0303';
+                starfield.appendChild(star);
+            }
+            
+            for (let i = 0; i < 4; i++) {
+                const nebula = document.createElement('div');
+                nebula.className = 'nebula';
+                const size = Math.random() * 400 + 100;
+                nebula.style.width = `${size}px`;
+                nebula.style.height = `${size}px`;
+                nebula.style.left = `${Math.random() * 100}%`;
+                nebula.style.top = `${Math.random() * 100}%`;
+                const colors = ['#8a0303', '#330000', '#ff0000'];
+                nebula.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                nebula.style.animationDuration = `${Math.random() * 80 + 40}s`;
+                starfield.appendChild(nebula);
+            }
+        }
+        
+        function createBloodParticles(x, y, count) {
+            for (let i = 0; i < count; i++) {
+                bloodParticles.push({
+                    x: x,
+                    y: y,
+                    size: Math.random() * 5 + 2,
+                    speedX: Math.random() * 6 - 3,
+                    speedY: Math.random() * 6 - 3,
+                    alpha: 1,
+                    decay: Math.random() * 0.02 + 0.01
+                });
+            }
+        }
+        
+        function createHorrorEffect() {
+            const effect = document.createElement('div');
+            effect.className = 'horror-effect';
+            document.getElementById('game-container').appendChild(effect);
+            setTimeout(() => effect.remove(), 300);
+        }
+        
+        function createBloodSplatter() {
+            const splatter = document.createElement('div');
+            splatter.className = 'blood-splatter';
+            document.getElementById('game-container').appendChild(splatter);
+            setTimeout(() => splatter.remove(), 1000);
+        }
+        
+        function playSound(url, volume = 0.5, loop = false) {
+            try {
+                const sound = new Audio(url);
+                sound.volume = volume;
+                sound.loop = loop;
+                sound.play().catch(e => console.log('Sound play failed:', e));
+                return sound;
+            } catch (e) {
+                console.log('Sound error:', e);
+                return null;
+            }
+        }
+        
+        function startGame() {
+            gameRunning = true;
+            score = 0;
+            health = shipTypes[player.shipType].health * upgrades.health;
+            level = 1;
+            enemiesDefeated = 0;
+            bullets = [];
+            enemies = [];
+            powerups = [];
+            explosions = [];
+            bloodParticles = [];
+            powerupActive = false;
+            bossActive = false;
+            
+            if (currentMission && currentMission.type === 'survive') {
+                currentMission.startTime = Date.now();
+            }
+            
+            scoreDisplay.textContent = `SOULS: ${score}`;
+            coinsDisplay.textContent = `COINS: ${coins}`;
+            levelDisplay.textContent = `NIGHTMARE LEVEL: ${level}`;
+            updateHealthBar();
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            
+            player.x = canvas.width / 2 - player.width / 2;
+            player.y = canvas.height - player.height - 20;
+            
+            // Show UI elements
+            shopBtn.style.display = 'block';
+            leaderboardBtn.style.display = 'block';
+            feedbackBtn.style.display = 'block';
+            adsContainer.style.display = 'flex';
+            missionContainer.style.display = 'block';
+            characterDisplay.style.display = 'block';
+            
+            playSound('https://assets.mixkit.co/sfx/preview/mixkit-horror-laugh-283.mp3');
+            const bgMusic = playSound('https://assets.mixkit.co/sfx/preview/mixkit-creepy-horror-ambience-2667.mp3', 0.3, true);
+            
+            // Save reference to background music to stop it later
+            if (bgMusic) {
+                bgMusic.id = 'bg-music';
+            }
+        }
+        
+        function restartGame() {
+            gameOverScreen.style.display = 'none';
+            startGame();
+        }
+        
+        function returnToMenu() {
+            gameOverScreen.style.display = 'none';
+            startScreen.style.display = 'flex';
+            
+            // Stop background music
+            const bgMusic = document.getElementById('bg-music');
+            if (bgMusic) {
+                bgMusic.pause();
+            }
+        }
+        
+        function pauseGame() {
+            gameRunning = false;
+            
+            // Pause background music
+            const bgMusic = document.getElementById('bg-music');
+            if (bgMusic) {
+                bgMusic.pause();
+            }
+        }
+        
+        function resumeGame() {
+            gameRunning = true;
+            timestamp = performance.now();
+            
+            if (currentMission && currentMission.type === 'survive') {
+                currentMission.startTime = Date.now() - missionProgressCount;
+            }
+            
+            // Resume background music
+            const bgMusic = document.getElementById('bg-music');
+            if (bgMusic) {
+                bgMusic.play();
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function gameOver() {
+            gameRunning = false;
+            
+            // Apply character bonus to score
+            const finalScore = Math.floor(score * player.characterBonuses.soulMultiplier);
+            const coinsEarned = Math.floor(finalScore / 10) * player.characterBonuses.coinMultiplier;
+            
+            finalScoreDisplay.textContent = `SOULS COLLECTED: ${finalScore}`;
+            document.getElementById('final-coins').textContent = `COINS EARNED: ${coinsEarned}`;
+            
+            // Add coins based on score
+            coins += coinsEarned;
+            
+            // Update mission progress for survival time
+            if (currentMission && currentMission.type === 'survive') {
+                missionProgressCount = Date.now() - currentMission.startTime;
+                updateMissionDisplay();
+                checkMissionCompletion();
+            }
+            
+            // Save user data
+            if (isLoggedIn && auth.currentUser) {
+                db.collection('users').doc(auth.currentUser.uid).update({
+                    coins: coins,
+                    highScore: Math.max(userData.highScore || 0, finalScore)
+                }).catch(error => {
+                    console.error('Error saving user data:', error);
+                });
+            } else {
+                saveLocalData();
+            }
+            
+            gameOverScreen.style.display = 'flex';
+            playSound('https://assets.mixkit.co/sfx/preview/mixkit-scream-horror-voice-2830.mp3');
+            
+            // Stop background music
+            const bgMusic = document.getElementById('bg-music');
+            if (bgMusic) {
+                bgMusic.pause();
+            }
+        }
+        
+        function gameLoop(currentTime) {
+            if (!timestamp) timestamp = currentTime;
+            const deltaTime = currentTime - timestamp;
+            timestamp = currentTime;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (gameRunning) {
+                updatePlayer(deltaTime);
+                updateBullets();
+                spawnEnemies(deltaTime);
+                updateEnemies(deltaTime);
+                spawnPowerups(deltaTime);
+                updatePowerups();
+                updateExplosions();
+                updateBloodParticles();
+                checkCollisions();
+                updatePowerupTimer();
+                updateBoss(deltaTime);
+                
+                // Update survival mission progress
+                if (currentMission && currentMission.type === 'survive') {
+                    missionProgressCount = Date.now() - currentMission.startTime;
+                    updateMissionDisplay();
+                    checkMissionCompletion();
+                }
+                
+                if (Math.random() < 0.005) {
+                    createHorrorEffect();
+                    playSound('https://assets.mixkit.co/sfx/preview/mixkit-horror-demonic-voice-26.mp3', 0.5);
+                }
+                
+                if (!bossActive && enemiesDefeated >= level * 5) {
+                    level++;
+                    enemySpawnRate = Math.max(500, enemySpawnRate - 200);
+                    levelDisplay.textContent = `NIGHTMARE LEVEL: ${level}`;
+                    playSound('https://assets.mixkit.co/sfx/preview/mixkit-demonic-laugh-2831.mp3', 0.6);
+                    createLevelUpEffect();
+                    createBloodSplatter();
+                    
+                    // Every 3 levels, spawn a boss
+                    if (level % 3 === 0) {
+                        spawnBoss();
+                    }
+                    
+                    // Every 10 levels, increase difficulty significantly
+                    if (level % 10 === 0) {
+                        showNotification('WARNING', 'The horrors grow stronger!');
+                        createHorrorEffect();
+                    }
+                }
+            }
+            
+            drawPlayer();
+            drawBullets();
+            drawEnemies();
+            drawPowerups();
+            drawExplosions();
+            drawBloodParticles();
+            drawBoss();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function updatePlayer(deltaTime) {
+            if (player.isMovingLeft) player.x -= player.speed;
+            if (player.isMovingRight) player.x += player.speed;
+            if (player.isMovingUp) player.y -= player.speed;
+            if (player.isMovingDown) player.y += player.speed;
+            
+            player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+            player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+            
+            if (player.isFiring && timestamp - player.lastFired > player.fireRate) {
+                fireBullet();
+                player.lastFired = timestamp;
+            }
+            
+            player.engineGlow = (player.engineGlow + deltaTime * 0.01) % (Math.PI * 2);
+        }
+        
+        function fireBullet() {
+            const bulletConfig = {
+                x: player.x + player.width / 2 - bulletWidth / 2,
+                y: player.y,
+                width: bulletWidth,
+                height: bulletHeight,
+                speed: bulletSpeed,
+                color: powerupActive && powerupType === 'double' ? '#ff6600' : '#8a0303'
+            };
+            
+            bullets.push(bulletConfig);
+            
+            if (powerupActive && powerupType === 'double') {
+                bullets.push({
+                    ...bulletConfig,
+                    x: player.x + player.width / 4 - bulletWidth / 2,
+                    color: '#ff6600'
+                });
+                
+                bullets.push({
+                    ...bulletConfig,
+                    x: player.x + player.width * 3/4 - bulletWidth / 2,
+                    color: '#ff6600'
+                });
+            }
+            
+            // Triple shot for Doom Bringer ship
+            if (player.shipType === 'doom') {
+                bullets.push({
+                    ...bulletConfig,
+                    x: player.x + player.width / 4 - bulletWidth / 2,
+                    color: '#ff0000'
+                });
+                
+                bullets.push({
+                    ...bulletConfig,
+                    x: player.x + player.width * 3/4 - bulletWidth / 2,
+                    color: '#ff0000'
+                });
+            }
+            
+            playSound('https://assets.mixkit.co/sfx/preview/mixkit-dark-arrow-shot-2080.mp3');
+        }
+        
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].y -= bullets[i].speed;
+                if (bullets[i].y + bullets[i].height < 0) bullets.splice(i, 1);
+            }
+        }
+        
+        function spawnEnemies(deltaTime) {
+            if (bossActive) return; // Don't spawn regular enemies during boss fight
+            
+            if (timestamp - lastEnemySpawn > enemySpawnRate) {
+                const enemyTypes = [
+                    { width: 60, height: 60, health: 1, color: '#8a0303', speed: enemySpeed * 1.2, score: 100, 
+                     image: 'https://cdn-icons-png.flaticon.com/512/3038/3038126.png', 
+                     sound: 'https://assets.mixkit.co/sfx/preview/mixkit-monster-growl-7.mp3',
+                     name: 'Lesser Horror' },
+                     
+                    { width: 80, height: 80, health: 2, color: '#330000', speed: enemySpeed, score: 200, 
+                     image: 'https://cdn-icons-png.flaticon.com/512/3038/3038138.png', 
+                     sound: 'https://assets.mixkit.co/sfx/preview/mixkit-monster-growl-11.mp3',
+                     name: 'Blood Crawler' },
+                     
+                    { width: 100, height: 100, health: 3, color: '#ff0000', speed: enemySpeed * 0.8, score: 300, 
+                     image: 'https://cdn-icons-png.flaticon.com/512/3038/3038154.png', 
+                     sound: 'https://assets.mixkit.co/sfx/preview/mixkit-monster-growl-13.mp3',
+                     name: 'Flesh Abomination' },
+                     
+                    { width: 120, height: 120, health: 5, color: '#660000', speed: enemySpeed * 0.7, score: 500, 
+                     image: 'https://cdn-icons-png.flaticon.com/512/3038/3038160.png', 
+                     sound: 'https://assets.mixkit.co/sfx/preview/mixkit-monster-growl-15.mp3',
+                     name: 'Void Spawn' }
+                ];
+                
+                // Scale enemy stats with level
+                const levelScale = Math.min(10, Math.floor(level / 10) + 1);
+                
+                // Choose enemy type based on level
+                let availableTypes = enemyTypes;
+                if (level < 5) availableTypes = enemyTypes.slice(0, 2);
+                else if (level < 10) availableTypes = enemyTypes.slice(0, 3);
+                
+                const type = Math.floor(Math.random() * availableTypes.length);
+                let enemy = {...availableTypes[type]};
+                
+                // Scale health and score with level
+                enemy.health *= levelScale;
+                enemy.maxHealth = enemy.health;
+                enemy.score *= levelScale;
+                
+                enemies.push({
+                    ...enemy,
+                    x: Math.random() * (canvas.width - enemy.width),
+                    y: -enemy.height,
+                    image: new Image(),
+                    rotation: Math.random() * Math.PI * 2,
+                    rotationSpeed: (Math.random() - 0.5) * 0.05
+                });
+                
+                enemies[enemies.length - 1].image.src = enemy.image;
+                if (Math.random() < 0.3) playSound(enemy.sound, 0.4);
+                lastEnemySpawn = timestamp;
+            }
+        }
+        
+        function updateEnemies(deltaTime) {
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                enemies[i].y += enemies[i].speed;
+                enemies[i].rotation += enemies[i].rotationSpeed;
+                if (enemies[i].y > canvas.height) enemies.splice(i, 1);
+            }
+        }
+        
+        function spawnBoss() {
+            bossActive = true;
+            bossHealthContainer.style.display = 'block';
+            
+            const bossTypes = [
+                {
+                    name: 'ELDER HORROR',
+                    width: 200,
+                    height: 200,
+                    speed: 1.5,
+                    health: 20 * level,
+                    score: 1000 * level,
+                    image: 'https://cdn-icons-png.flaticon.com/512/3038/3038162.png',
+                    sound: 'https://assets.mixkit.co/sfx/preview/mixkit-monster-growl-15.mp3',
+                    attackRate: 2000,
+                    movePattern: 0
+                },
+                {
+                    name: 'COSMIC TERROR',
+                    width: 250,
+                    height: 250,
+                    speed: 1.2,
+                    health: 25 * level,
+                    score: 1500 * level,
+                    image: 'https://cdn-icons-png.flaticon.com/512/3038/3038164.png',
+                    sound: 'https://assets.mixkit.co/sfx/preview/mixkit-monster-growl-16.mp3',
+                    attackRate: 1500,
+                    movePattern: 1
+                },
+                {
+                    name: 'VOID LURKER',
+                    width: 300,
+                    height: 200,
+                    speed: 1.8,
+                    health: 15 * level,
+                    score: 1200 * level,
+                    image: 'https://cdn-icons-png.flaticon.com/512/3038/3038166.png',
+                    sound: 'https://assets.mixkit.co/sfx/preview/mixkit-monster-growl-17.mp3',
+                    attackRate: 1000,
+                    movePattern: 2
+                }
+            ];
+            
+            // Choose boss based on level
+            const bossIndex = Math.min(Math.floor(level / 10), bossTypes.length - 1);
+            boss = {...bossTypes[bossIndex]};
+            
+            boss.maxHealth = boss.health;
+            boss.x = canvas.width / 2 - boss.width / 2;
+            boss.y = -boss.height;
+            boss.image = new Image();
+            boss.image.src = boss.image;
+            boss.lastAttack = 0;
+            boss.moveTimer = 0;
+            boss.phase = 1;
+            boss.rotation = 0;
+            boss.rotationSpeed = 0.01;
+            
+            bossName.textContent = `${boss.name} (LVL ${level})`;
+            bossHealthBar.style.width = '100%';
+            
+            playSound(boss.sound, 0.7);
+            showNotification('BOSS INCOMING', `${boss.name} has appeared!`);
+        }
+        
+        function updateBoss(deltaTime) {
+            if (!bossActive || !boss) return;
+            
+            // Boss movement
+            boss.moveTimer += deltaTime;
+            
+            if (boss.movePattern === 0) {
+                // Initial descent
+                if (boss.y < 50) {
+                    boss.y += boss.speed;
+                } else {
+                    // Side to side movement
+                    boss.x += Math.sin(boss.moveTimer / 1000) * 3;
+                }
+            } else if (boss.movePattern === 1) {
+                // Circular movement
+                if (boss.y < 50) {
+                    boss.y += boss.speed;
+                } else {
+                    const radius = canvas.width / 4;
+                    boss.x = canvas.width / 2 + Math.cos(boss.moveTimer / 2000) * radius - boss.width / 2;
+                    boss.y = 50 + Math.sin(boss.moveTimer / 2000) * 50;
+                }
+            } else if (boss.movePattern === 2) {
+                // Zigzag movement
+                if (boss.y < 50) {
+                    boss.y += boss.speed;
+                } else {
+                    boss.x += Math.sin(boss.moveTimer / 500) * 5;
+                }
+            }
+            
+            // Keep boss on screen
+            boss.x = Math.max(0, Math.min(canvas.width - boss.width, boss.x));
+            
+            // Boss attacks
+            if (timestamp - boss.lastAttack > boss.attackRate) {
+                boss.lastAttack = timestamp;
+                
+                // Different attacks based on phase
+                if (boss.health / boss.maxHealth > 0.5) {
+                    // Phase 1: Single projectile
+                    enemies.push({
+                        x: boss.x + boss.width / 2 - 30,
+                        y: boss.y + boss.height,
+                        width: 60,
+                        height: 60,
+                        speed: 4,
+                        health: 1,
+                        color: '#ff0000',
+                        score: 0,
+                        image: new Image(),
+                        type: 3,
+                        rotation: 0,
+                        rotationSpeed: 0.05,
+                        name: 'Horror Spawn'
+                    });
+                    enemies[enemies.length - 1].image.src = 'https://cdn-icons-png.flaticon.com/512/3038/3038170.png';
+                } else {
+                    // Phase 2: Spread projectiles
+                    for (let i = 0; i < 5; i++) {
+                        enemies.push({
+                            x: boss.x + boss.width / 2 - 30 + (i - 2) * 40,
+                            y: boss.y + boss.height,
+                            width: 60,
+                            height: 60,
+                            speed: 4,
+                            health: 1,
+                            color: '#ff0000',
+                            score: 0,
+                            image: new Image(),
+                            type: 3,
+                            rotation: 0,
+                            rotationSpeed: 0.05,
+                            name: 'Horror Spawn'
+                        });
+                        enemies[enemies.length - 1].image.src = 'https://cdn-icons-png.flaticon.com/512/3038/3038170.png';
+                    }
+                }
+            }
+            
+            boss.rotation += boss.rotationSpeed;
+            
+            // Update health bar
+            const healthPercent = (boss.health / boss.maxHealth) * 100;
+            bossHealthBar.style.width = `${healthPercent}%`;
+            
+            // Check if boss is defeated
+            if (boss.health <= 0) {
+                // Apply character bonus to score
+                const bossScore = Math.floor(boss.score * player.characterBonuses.soulMultiplier);
+                score += bossScore;
+                scoreDisplay.textContent = `SOULS: ${score}`;
+                
+                createExplosion(boss.x + boss.width / 2, boss.y + boss.height / 2);
+                createBloodParticles(boss.x + boss.width / 2, boss.y + boss.height / 2, 50);
+                playSound('https://assets.mixkit.co/sfx/preview/mixkit-explosion-hit-with-debris-1707.mp3');
+                
+                showNotification('BOSS DEFEATED', `You earned ${bossScore} souls!`);
+                
+                bossActive = false;
+                bossHealthContainer.style.display = 'none';
+                enemiesDefeated = 0; // Reset for next level
+            }
+        }
+        
+        function drawBoss() {
+            if (!bossActive || !boss) return;
+            
+            if (boss.image.complete) {
+                ctx.save();
+                ctx.translate(boss.x + boss.width / 2, boss.y + boss.height / 2);
+                ctx.rotate(boss.rotation);
+                ctx.drawImage(boss.image, -boss.width / 2, -boss.height / 2, boss.width, boss.height);
+                ctx.restore();
+            } else {
+                ctx.fillStyle = boss.color;
+                ctx.fillRect(boss.x, boss.y, boss.width, boss.height);
+            }
+            
+            // Glow effect
+            ctx.shadowColor = boss.color;
+            ctx.shadowBlur = 20;
+            if (boss.image.complete) {
+                ctx.save();
+                ctx.translate(boss.x + boss.width / 2, boss.y + boss.height / 2);
+                ctx.rotate(boss.rotation);
+                ctx.drawImage(boss.image, -boss.width / 2, -boss.height / 2, boss.width, boss.height);
+                ctx.restore();
+            } else {
+                ctx.fillRect(boss.x, boss.y, boss.width, boss.height);
+            }
+            ctx.shadowBlur = 0;
+        }
+        
+        function spawnPowerups(deltaTime) {
+            if (timestamp - lastPowerupSpawn > powerupSpawnRate) {
+                const powerupTypes = [
+                    { type: 'health', color: '#00ff00', image: 'https://cdn-icons-png.flaticon.com/512/2738/2738876.png', 
+                     duration: 0, sound: 'https://assets.mixkit.co/sfx/preview/mixkit-ominous-drums-561.mp3',
+                     name: 'Health Orb' },
+                     
+                    { type: 'double', color: '#ffff00', image: 'https://cdn-icons-png.flaticon.com/512/2738/2738887.png', 
+                     duration: 10000, sound: 'https://assets.mixkit.co/sfx/preview/mixkit-spooky-whispers-566.mp3',
+                     name: 'Double Shot' },
+                     
+                    { type: 'shield', color: '#00ffff', image: 'https://cdn-icons-png.flaticon.com/512/2738/2738895.png', 
+                     duration: 8000, sound: 'https://assets.mixkit.co/sfx/preview/mixkit-spooky-howl-567.mp3',
+                     name: 'Shield Generator' },
+                     
+                    { type: 'score', color: '#ff00ff', image: 'https://cdn-icons-png.flaticon.com/512/2738/2738902.png', 
+                     duration: 15000, sound: 'https://assets.mixkit.co/sfx/preview/mixkit-spooky-whispers-568.mp3',
+                     name: 'Soul Collector' }
+                ];
+                
+                const type = Math.floor(Math.random() * powerupTypes.length);
+                const powerup = powerupTypes[type];
+                
+                powerups.push({
+                    x: Math.random() * (canvas.width - 50),
+                    y: -50,
+                    width: 50,
+                    height: 50,
+                    speed: 3,
+                    type: powerup.type,
+                    color: powerup.color,
+                    image: new Image(),
+                    duration: powerup.duration,
+                    sound: powerup.sound,
+                    rotation: 0,
+                    rotationSpeed: 0.02,
+                    name: powerup.name
+                });
+                
+                powerups[powerups.length - 1].image.src = powerup.image;
+                lastPowerupSpawn = timestamp;
+            }
+        }
+        
+        function updatePowerups() {
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                powerups[i].y += powerups[i].speed;
+                powerups[i].rotation += powerups[i].rotationSpeed;
+                if (powerups[i].y > canvas.height) powerups.splice(i, 1);
+            }
+        }
+        
+        function updatePowerupTimer() {
+            if (powerupActive) {
+                const remaining = Math.max(0, powerupEndTime - timestamp);
+                powerupTimer.textContent = `${(remaining / 1000).toFixed(1)}s`;
+                if (remaining <= 0) deactivatePowerup();
+            }
+        }
+        
+        function activatePowerup(type, duration) {
+            powerupActive = true;
+            powerupType = type;
+            powerupEndTime = timestamp + duration;
+            powerupIndicator.style.display = 'flex';
+            powerupIcon.style.backgroundImage = `url(${getPowerupImage(type)})`;
+            playSound(powerups.find(p => p.type === type).sound);
+            createPowerupEffect();
+            
+            if (type === 'double') {
+                player.fireRate = 150 / upgrades.firerate;
+            } else if (type === 'shield') {
+                createBloodSplatter();
+            }
+            
+            // Update mission progress for powerup collection
+            if (currentMission && currentMission.type === 'powerup') {
+                missionProgressCount++;
+                updateMissionDisplay();
+                checkMissionCompletion();
+            }
+        }
+        
+        function deactivatePowerup() {
+            powerupActive = false;
+            powerupIndicator.style.display = 'none';
+            player.fireRate = shipTypes[player.shipType].fireRate / upgrades.firerate;
+            playSound('https://assets.mixkit.co/sfx/preview/mixkit-unlock-game-notification-253.mp3');
+        }
+        
+        function getPowerupImage(type) {
+            switch (type) {
+                case 'health': return 'https://cdn-icons-png.flaticon.com/512/2738/2738876.png';
+                case 'double': return 'https://cdn-icons-png.flaticon.com/512/2738/2738887.png';
+                case 'shield': return 'https://cdn-icons-png.flaticon.com/512/2738/2738895.png';
+                case 'score': return 'https://cdn-icons-png.flaticon.com/512/2738/2738902.png';
+                default: return '';
+            }
+        }
+        
+        function checkCollisions() {
+            // Bullet-enemy collisions
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    if (checkCollision(bullets[i], enemies[j])) {
+                        enemies[j].health--;
+                        bullets.splice(i, 1);
+                        createExplosion(enemies[j].x + enemies[j].width/2, enemies[j].y + enemies[j].height/2);
+                        createBloodParticles(enemies[j].x, enemies[j].y, 10);
+                        playSound('https://assets.mixkit.co/sfx/preview/mixkit-8-bit-arcade-hit-2181.mp3');
+
+                        if (enemies[j].health <= 0) {
+                            // Apply character bonus to score
+                            const enemyScore = Math.floor(enemies[j].score * player.characterBonuses.soulMultiplier);
+                            score += enemyScore;
+                            enemiesDefeated++;
+                            scoreDisplay.textContent = `SOULS: ${score}`;
+                            playSound('https://assets.mixkit.co/sfx/preview/mixkit-explosion-hit-with-debris-1707.mp3');
+                            enemies.splice(j, 1);
+                            
+                            // Update mission progress for kills
+                            if (currentMission && currentMission.type === 'kill') {
+                                missionProgressCount++;
+                                updateMissionDisplay();
+                                checkMissionCompletion();
+                            }
+                        }
+                        break;
+                    }
+                }
+                
+                // Bullet-boss collisions
+                if (bossActive && boss && checkCollision(bullets[i], boss)) {
+                    boss.health--;
+                    bullets.splice(i, 1);
+                    createExplosion(bullets[i].x + bullets[i].width/2, bullets[i].y + bullets[i].height/2);
+                    playSound('https://assets.mixkit.co/sfx/preview/mixkit-8-bit-arcade-hit-2181.mp3');
+                }
+            }
+
+            // Player-enemy collisions
+            if (!powerupActive || powerupType !== 'shield') {
+                for (let i = enemies.length - 1; i >= 0; i--) {
+                    if (checkCollision(player, enemies[i])) {
+                        health -= 10;
+                        updateHealthBar();
+                        enemies.splice(i, 1);
+                        createExplosion(player.x + player.width/2, player.y + player.height/2);
+                        createBloodSplatter();
+                        createHorrorEffect();
+                        playSound('https://assets.mixkit.co/sfx/preview/mixkit-player-losing-or-failing-2042.mp3');
+
+                        if (health <= 0) {
+                            health = 0;
+                            updateHealthBar();
+                            gameOver();
+                        }
+                    }
+                }
+                
+                // Player-boss collision
+                if (bossActive && boss && checkCollision(player, boss)) {
+                    health -= 20;
+                    updateHealthBar();
+                    createExplosion(player.x + player.width/2, player.y + player.height/2);
+                    createBloodSplatter();
+                    createHorrorEffect();
+                    playSound('https://assets.mixkit.co/sfx/preview/mixkit-player-losing-or-failing-2042.mp3');
+
+                    if (health <= 0) {
+                        health = 0;
+                        updateHealthBar();
+                        gameOver();
+                    }
+                }
+            }
+
+            // Player-powerup collisions
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                if (checkCollision(player, powerups[i])) {
+                    if (powerups[i].type === 'health') {
+                        health = Math.min(shipTypes[player.shipType].health * upgrades.health, health + 30);
+                        updateHealthBar();
+                        createBloodParticles(player.x, player.y, 20);
+                    } else if (powerups[i].type === 'score') {
+                        // Score multiplier for a duration
+                        const originalMultiplier = player.characterBonuses.soulMultiplier;
+                        player.characterBonuses.soulMultiplier *= 2;
+                        setTimeout(() => {
+                            player.characterBonuses.soulMultiplier = originalMultiplier;
+                        }, powerups[i].duration);
+                        activatePowerup(powerups[i].type, powerups[i].duration);
+                    } else {
+                        activatePowerup(powerups[i].type, powerups[i].duration);
+                    }
+                    powerups.splice(i, 1);
+                }
+            }
+        }
+        
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+        
+        function updateHealthBar() {
+            const maxHealth = shipTypes[player.shipType].health * upgrades.health;
+            const healthPercent = (health / maxHealth) * 100;
+            healthBar.style.width = `${healthPercent}%`;
+            healthText.textContent = `${Math.round(health)}/${Math.round(maxHealth)}`;
+            
+            if (healthPercent > 60) {
+                healthBar.style.background = 'linear-gradient(90deg, #00ff00 0%, #00cc00 100%)';
+            } else if (healthPercent > 30) {
+                healthBar.style.background = 'linear-gradient(90deg, #ffff00 0%, #ffcc00 100%)';
+            } else {
+                healthBar.style.background = 'linear-gradient(90deg, #ff0000 0%, #cc0000 100%)';
+            }
+        }
+        
+        function createExplosion(x, y) {
+            explosions.push({
+                x: x - 50,
+                y: y - 50,
+                width: 100,
+                height: 100,
+                frame: 0,
+                maxFrames: 10
+            });
+        }
+        
+        function updateExplosions() {
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                explosions[i].frame++;
+                if (explosions[i].frame >= explosions[i].maxFrames) {
+                    explosions.splice(i, 1);
+                }
+            }
+        }
+        
+        function updateBloodParticles() {
+            for (let i = bloodParticles.length - 1; i >= 0; i--) {
+                bloodParticles[i].x += bloodParticles[i].speedX;
+                bloodParticles[i].y += bloodParticles[i].speedY;
+                bloodParticles[i].alpha -= bloodParticles[i].decay;
+                if (bloodParticles[i].alpha <= 0) bloodParticles.splice(i, 1);
+            }
+        }
+        
+        function createPowerupEffect() {
+            const effect = document.createElement('div');
+            effect.className = 'powerup-effect';
+            effect.style.position = 'absolute';
+            effect.style.left = `${player.x}px`;
+            effect.style.top = `${player.y}px`;
+            effect.style.width = `${player.width}px`;
+            effect.style.height = `${player.height}px`;
+            effect.style.borderRadius = '50%';
+            effect.style.backgroundColor = powerupType === 'double' ? 'rgba(255, 255, 0, 0.3)' : 
+                                          powerupType === 'shield' ? 'rgba(0, 255, 255, 0.3)' : 
+                                          powerupType === 'score' ? 'rgba(255, 0, 255, 0.3)' : 'rgba(0, 255, 0, 0.3)';
+            effect.style.boxShadow = `0 0 20px 10px ${powerupType === 'double' ? '#ffff00' : 
+                                    powerupType === 'shield' ? '#00ffff' : 
+                                    powerupType === 'score' ? '#ff00ff' : '#00ff00'}`;
+            effect.style.zIndex = '4';
+            effect.style.pointerEvents = 'none';
+            effect.style.animation = 'fadeOut 1s forwards';
+            document.getElementById('game-container').appendChild(effect);
+            setTimeout(() => effect.remove(), 1000);
+        }
+        
+        function createLevelUpEffect() {
+            const effect = document.createElement('div');
+            effect.className = 'level-up-effect';
+            effect.style.position = 'absolute';
+            effect.style.left = '0';
+            effect.style.top = '0';
+            effect.style.width = '100%';
+            effect.style.height = '100%';
+            effect.style.background = 'radial-gradient(circle, rgba(0,255,252,0.3) 0%, rgba(0,0,0,0) 70%';
+            effect.style.zIndex = '4';
+            effect.style.pointerEvents = 'none';
+            effect.style.animation = 'fadeOut 1s forwards';
+            document.getElementById('game-container').appendChild(effect);
+            setTimeout(() => effect.remove(), 1000);
+        }
+        
+        function drawPlayer() {
+            if (player.image.complete) {
+                ctx.drawImage(player.image, player.x, player.y, player.width, player.height);
+            } else {
+                ctx.fillStyle = player.color;
+                ctx.fillRect(player.x, player.y, player.width, player.height);
+            }
+            
+            if (powerupActive && powerupType === 'shield') {
+                ctx.strokeStyle = '#00ffff';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(
+                    player.x + player.width / 2,
+                    player.y + player.height / 2,
+                    Math.max(player.width, player.height) * 0.7,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
+                ctx.fill();
+            }
+            
+            // Engine glow
+            const glowAlpha = 0.5 + Math.sin(player.engineGlow) * 0.3;
+            ctx.fillStyle = `rgba(255, 0, 0, ${glowAlpha})`;
+            ctx.fillRect(
+                player.x + player.width/4,
+                player.y + player.height,
+                player.width/2,
+                20
+            );
+            
+            // Ship-specific effects
+            if (player.shipType === 'doom') {
+                ctx.strokeStyle = `rgba(255, 0, 0, ${glowAlpha})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(player.x + player.width/4, player.y + player.height);
+                ctx.lineTo(player.x + player.width/4 - 20, player.y + player.height + 30);
+                ctx.moveTo(player.x + player.width*3/4, player.y + player.height);
+                ctx.lineTo(player.x + player.width*3/4 + 20, player.y + player.height + 30);
+                ctx.stroke();
+            }
+        }
+        
+        function drawBullets() {
+            for (const bullet of bullets) {
+                ctx.fillStyle = bullet.color;
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                ctx.shadowColor = bullet.color;
+                ctx.shadowBlur = 10;
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        function drawEnemies() {
+            for (const enemy of enemies) {
+                if (enemy.image.complete) {
+                    ctx.save();
+                    ctx.translate(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
+                    ctx.rotate(enemy.rotation);
+                    ctx.drawImage(enemy.image, -enemy.width/2, -enemy.height/2, enemy.width, enemy.height);
+                    ctx.restore();
+                } else {
+                    ctx.fillStyle = enemy.color;
+                    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                }
+                
+                if (enemy.health < enemy.maxHealth) {
+                    const healthPercent = enemy.health / enemy.maxHealth;
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(enemy.x, enemy.y - 10, enemy.width, 5);
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(enemy.x, enemy.y - 10, enemy.width * healthPercent, 5);
+                }
+                
+                ctx.shadowColor = enemy.color;
+                ctx.shadowBlur = 15;
+                if (enemy.image.complete) {
+                    ctx.save();
+                    ctx.translate(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
+                    ctx.rotate(enemy.rotation);
+                    ctx.drawImage(enemy.image, -enemy.width/2, -enemy.height/2, enemy.width, enemy.height);
+                    ctx.restore();
+                } else {
+                    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                }
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        function drawPowerups() {
+            for (const powerup of powerups) {
+                if (powerup.image.complete) {
+                    ctx.save();
+                    ctx.translate(powerup.x + powerup.width/2, powerup.y + powerup.height/2);
+                    ctx.rotate(powerup.rotation);
+                    ctx.drawImage(powerup.image, -powerup.width/2, -powerup.height/2, powerup.width, powerup.height);
+                    ctx.restore();
+                } else {
+                    ctx.fillStyle = powerup.color;
+                    ctx.fillRect(powerup.x, powerup.y, powerup.width, powerup.height);
+                }
+                
+                const pulse = Math.sin(timestamp / 200) * 5 + 5;
+                ctx.shadowColor = powerup.color;
+                ctx.shadowBlur = pulse;
+                if (powerup.image.complete) {
+                    ctx.save();
+                    ctx.translate(powerup.x + powerup.width/2, powerup.y + powerup.height/2);
+                    ctx.rotate(powerup.rotation);
+                    ctx.drawImage(powerup.image, -powerup.width/2, -powerup.height/2, powerup.width, powerup.height);
+                    ctx.restore();
+                } else {
+                    ctx.fillRect(powerup.x, powerup.y, powerup.width, powerup.height);
+                }
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        function drawExplosions() {
+            for (const explosion of explosions) {
+                const progress = explosion.frame / explosion.maxFrames;
+                const size = explosion.width * (1 + progress * 2);
+                const alpha = 1 - progress;
+                
+                const gradient = ctx.createRadialGradient(
+                    explosion.x + explosion.width / 2,
+                    explosion.y + explosion.height / 2,
+                    0,
+                    explosion.x + explosion.width / 2,
+                    explosion.y + explosion.height / 2,
+                    size / 2
+                );
+                
+                gradient.addColorStop(0, `rgba(255, 100, 0, ${alpha})`);
+                gradient.addColorStop(0.5, `rgba(255, 200, 0, ${alpha * 0.7})`);
+                gradient.addColorStop(1, `rgba(255, 50, 0, 0)`);
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(
+                    explosion.x + explosion.width / 2,
+                    explosion.y + explosion.height / 2,
+                    size / 2,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+        }
+        
+        function drawBloodParticles() {
+            for (const particle of bloodParticles) {
+                ctx.fillStyle = `rgba(138, 3, 3, ${particle.alpha})`;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        function handleKeyDown(e) {
+            switch (e.key) {
+                case 'ArrowLeft': player.isMovingLeft = true; break;
+                case 'ArrowRight': player.isMovingRight = true; break;
+                case 'ArrowUp': player.isMovingUp = true; break;
+                case 'ArrowDown': player.isMovingDown = true; break;
+                case ' ': player.isFiring = true; break;
+                case 'p': 
+                    if (gameRunning) pauseGame(); 
+                    else resumeGame();
+                    break;
+            }
+        }
+        
+        function handleKeyUp(e) {
+            switch (e.key) {
+                case 'ArrowLeft': player.isMovingLeft = false; break;
+                case 'ArrowRight': player.isMovingRight = false; break;
+                case 'ArrowUp': player.isMovingUp = false; break;
+                case 'ArrowDown': player.isMovingDown = false; break;
+                case ' ': player.isFiring = false; break;
+            }
+        }
+        
+        function handleMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            player.x = e.clientX - rect.left - player.width / 2;
+            player.y = e.clientY - rect.top - player.height / 2;
+            player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+            player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+        }
+        
+        function handleMouseClick() {
+            if (gameRunning) fireBullet();
+        }
+        
+        // Initialize the game
+        initGame();
+    </script>
+</body>
+</html>
